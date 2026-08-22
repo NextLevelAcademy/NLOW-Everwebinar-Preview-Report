@@ -82,8 +82,8 @@ export function downloadExcelReport(report: ReportData): void {
   // in B/C/D. Track current write index for each side.
   const metricRows: any[][] = [
     ["", "Opt In", m.optInCount, ""],
-    ["", "Opt In (without Invalid)", m.optInCount - (report.optInByCountry.INVALID || 0), ""],
-    ["", "Show Up", m.showUpCount, `${m.showUpPct.toFixed(1)}%`],
+    ["", "Opt In (without Invalid)", m.optInWithoutInvalidCount, ""],
+    ["", "Show Up", m.showUpCount, `${m.showUpPct.toFixed(1)}% of valid opt-ins`],
     ["", "Attendance at Pitch", m.attendanceAtPitch, `${m.attendanceAtPitchPct.toFixed(1)}%`],
     ["", "Sign Up", m.signUpCount, `${m.signUpPct.toFixed(1)}%`],
   ];

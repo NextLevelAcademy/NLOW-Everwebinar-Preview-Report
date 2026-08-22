@@ -47,8 +47,15 @@ export function deriveMetrics(
   const signUpByCountry = tally(signUpRows);
 
   const optInCount = optInRows.length;
+  const optInWithoutInvalidCount = optInCount - optInByCountry.INVALID;
   const showUpCount = showUpRows.length;
-  const showUpPct = optInCount > 0 ? (showUpCount / optInCount) * 100 : 0;
+  // Excludes flagged-invalid opt-ins from the denominator — a fake/placeholder
+  // contact was never a real shot at showing up, so it shouldn't drag the
+  // percentage down.
+  const showUpPct =
+    optInWithoutInvalidCount > 0
+      ? (showUpCount / optInWithoutInvalidCount) * 100
+      : 0;
   const showUpsNotInOptInCount = showUpRows.filter((r) => !r.inOptIn).length;
   const showUpsNotInOptInPct =
     showUpCount > 0 ? (showUpsNotInOptInCount / showUpCount) * 100 : 0;
@@ -74,6 +81,7 @@ export function deriveMetrics(
 
   const metrics: PreviewMetrics = {
     optInCount,
+    optInWithoutInvalidCount,
     showUpCount,
     showUpPct,
     showUpsNotInOptInCount,

@@ -566,11 +566,13 @@ function StatCard({
   pct,
   label,
   green,
+  subtext,
 }: {
   value: string | number;
   pct?: string;
   label: string;
   green: boolean;
+  subtext?: string;
 }) {
   const cls = green
     ? "rounded-xl border p-5 flex flex-col gap-1 border-green-400 bg-green-50 dark:bg-green-950/20"
@@ -587,6 +589,9 @@ function StatCard({
         </p>
       )}
       <p className="text-sm text-muted-foreground font-medium">{label}</p>
+      {subtext && (
+        <p className="text-xs text-muted-foreground mt-1">{subtext}</p>
+      )}
     </div>
   );
 }
@@ -1384,6 +1389,11 @@ function ReportView({
           pct={`${m.showUpPct.toFixed(1)}%`}
           label="Show Up"
           green
+          subtext={
+            report.optInByCountry.INVALID > 0
+              ? `% of ${m.optInWithoutInvalidCount} valid opt-ins (${report.optInByCountry.INVALID} invalid excluded)`
+              : undefined
+          }
         />
         <StatCard
           value={m.attendanceAtPitch}

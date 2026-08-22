@@ -114,8 +114,9 @@ export interface SessionDetails {
 
 export interface PreviewMetrics {
   optInCount: number;
+  optInWithoutInvalidCount: number; // optInCount minus flagged-INVALID opt-ins
   showUpCount: number;
-  showUpPct: number; // % of opt-in
+  showUpPct: number; // % of opt-in EXCLUDING flagged-invalid opt-ins
   showUpsNotInOptInCount: number;
   showUpsNotInOptInPct: number; // % of show-ups
   attendanceAtPitch: number; // from session details
