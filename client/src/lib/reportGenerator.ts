@@ -1,8 +1,6 @@
 import type {
-  CountryBreakdown,
   CountryGroup,
   OptInRow,
-  PreviewMetrics,
   ReportData,
   SessionDetails,
   ShowUpNotInOptInRow,
@@ -10,6 +8,7 @@ import type {
   SignUpRow,
 } from "../../../shared/schema";
 import { parseCsv, getVal } from "./csvParse";
+import { deriveMetrics } from "./deriveMetrics";
 
 // ============ Phone helpers (raw, kept here for clarity) ============
 
@@ -139,6 +138,38 @@ function parseKeapRows(rows: Record<string, any>[]): KeapRow[] {
       phone: getVal(r, ["Phone 1", "Phone", "Mobile", "Mobile Phone"]),
     }))
     .filter((r) => r.email);
+}
+
+/**
+ * Identifies opt-in contacts whose phone number is a placeholder rather than
+ * a real one, in real spam clusters:
+ *  - The same phone number is reused across 3+ otherwise-unrelated
+ *    contacts (a shared placeholder number, not a real one per person).
+ *  - The number itself is a placeholder pattern — 6 or more of the same
+ *    digit in a row (e.g. "95111111") — which real mobile numbers don't
+ *    produce.
+ * Returns the set of flagged emails; callers override those rows' country
+ * to INVALID. Rows can still be manually reclassified on the report page
+ * if this over-flags a genuine contact.
+ */
+function computeGibberishFlags(rows: KeapRow[]): Set<string> {
+  const phoneCounts = new Map<string, number>();
+  const phoneByEmail = new Map<string, string>();
+  for (const r of rows) {
+    const { fullPhone } = buildFullPhone(r.cc, r.phone);
+    if (fullPhone) phoneCounts.set(fullPhone, (phoneCounts.get(fullPhone) || 0) + 1);
+    if (r.email) phoneByEmail.set(r.email, fullPhone);
+  }
+  const repeatedDigitRun = /(\d)\1{5,}/; // same digit 6+ times in a row
+  const flagged = new Set<string>();
+  for (const r of rows) {
+    if (!r.email) continue;
+    const fullPhone = phoneByEmail.get(r.email) || "";
+    const sharedPhone = !!fullPhone && (phoneCounts.get(fullPhone) || 0) >= 3;
+    const placeholderPhone = !!fullPhone && repeatedDigitRun.test(fullPhone);
+    if (sharedPhone || placeholderPhone) flagged.add(r.email);
+  }
+  return flagged;
 }
 
 interface EWRow {
@@ -307,6 +338,7 @@ export async function generateReport(
   ]);
 
   const keap = parseKeapRows(keapRaw);
+  const gibberishEmails = computeGibberishFlags(keap);
   const ew = parseEWRows(ewRaw);
   const tc = parseTCRows(tcRaw);
   const bt = parseBTRows(btRaw);
@@ -642,60 +674,16 @@ export async function generateReport(
   for (const r of showUpRows) promoteRow(r, [signUpIdx, optInIdx]);
   for (const r of optInRows) promoteRow(r, [showUpIdx, signUpIdx]);
 
-  // ===== Country breakdowns =====
-  const tally = (rows: { country: CountryGroup }[]): CountryBreakdown => {
-    const out: CountryBreakdown = {
-      SG: 0, MY: 0, USA: 0, HK: 0, OTHERS: 0, INVALID: 0, NA: 0,
-    };
-    for (const r of rows) out[r.country]++;
-    return out;
-  };
-
-  const optInByCountry = tally(optInRows);
-  const showUpByCountry = tally(showUpRows);
-  const signUpByCountry = tally(signUpRows);
-
-  // ===== Metrics =====
-  const optInCount = optInRows.length;
-  const showUpCount = showUpRows.length;
-  const showUpPct = optInCount > 0 ? (showUpCount / optInCount) * 100 : 0;
-  const showUpsNotInOptInCount = showUpsNotInOptIn.length;
-  const showUpsNotInOptInPct =
-    showUpCount > 0 ? (showUpsNotInOptInCount / showUpCount) * 100 : 0;
-  const attendanceAtPitch = session.attendanceAtPitch ?? 0;
-  const attendanceAtPitchPct =
-    showUpCount > 0 ? (attendanceAtPitch / showUpCount) * 100 : 0;
-  const signUpCount = signUpRows.length;
-  const signUpPct = showUpCount > 0 ? (signUpCount / showUpCount) * 100 : 0;
-  const tcTotal = signUpRows
-    .filter((s) => s.source !== "BT")
-    .reduce((sum, s) => sum + (s.total || 0), 0);
-  const btCount = signUpRows.filter((s) => s.source === "BT").length;
-  const revenueTotal = tcTotal + btCount * (session.programPrice || 0);
-
-  // VW intake totals: each VW row's pastSignups + count of sign-ups whose intake matches
-  const signUpsByIntakeForVW: Record<string, number> = {};
-  for (const vw of session.vwDates) {
-    if (!vw.label) continue;
-    const monthSignups = signUpRows.filter(
-      (s) => s.intake.toLowerCase() === vw.label.toLowerCase()
-    ).length;
-    signUpsByIntakeForVW[vw.label] = (vw.pastSignups || 0) + monthSignups;
+  // Gibberish contacts are flagged INVALID after country cross-referencing so
+  // a shared placeholder phone can't get "promoted" back to SG/MY just
+  // because another spam row's tail happens to match a real contact.
+  for (const r of optInRows) {
+    if (gibberishEmails.has(r.email)) r.country = "INVALID";
   }
 
-  const metrics: PreviewMetrics = {
-    optInCount,
-    showUpCount,
-    showUpPct,
-    showUpsNotInOptInCount,
-    showUpsNotInOptInPct,
-    attendanceAtPitch,
-    attendanceAtPitchPct,
-    signUpCount,
-    signUpPct,
-    revenueTotal,
-    signUpsByIntakeForVW,
-  };
+  // ===== Metrics and country breakdowns =====
+  const { metrics, optInByCountry, showUpByCountry, signUpByCountry } =
+    deriveMetrics(session, optInRows, showUpRows, signUpRows);
 
   return {
     sessionDetails: session,
