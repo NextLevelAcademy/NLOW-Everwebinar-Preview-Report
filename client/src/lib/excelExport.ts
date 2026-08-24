@@ -205,16 +205,18 @@ export function downloadExcelReport(report: ReportData): void {
   XLSX.utils.book_append_sheet(wb, signUpSheet, "Sign Up");
 
   // ============ Sheet 5: Keap Workings ============
-  // Tag rules (same as before):
+  // Tag rules:
   //   Show-up + in opt-in + NOT signed up      → NLOW3,NLOW3-DDMMYY
   //   Show-up + in opt-in + signed up          → NLOW3,NLOW3-DDMMYY,NLOW4,NLOW4-DDMMYY
-  //   Show-up NOT in opt-in + NOT signed up    → NLOW3,NLOW3-DDMMYY,NLOW2,NLOW2-DDMMYY
-  //   Sign-up + show-up + NOT in opt-in        → NLOW3,NLOW3-DDMMYY,NLOW4,NLOW4-DDMMYY,NLOW2,NLOW2-DDMMYY
+  //   Show-up NOT in opt-in + NOT signed up    → NLOW3,NLOW3-DDMMYY,NLOW2,NLOWDDMMYY
+  //   Sign-up + show-up + NOT in opt-in        → NLOW3,NLOW3-DDMMYY,NLOW4,NLOW4-DDMMYY,NLOW2,NLOWDDMMYY
   //   Sign-up only (no show-up) + in opt-in    → NLOW4,NLOW4-DDMMYY
-  //   Sign-up only (no show-up) + NOT in opt-in→ NLOW4,NLOW4-DDMMYY,NLOW2,NLOW2-DDMMYY
+  //   Sign-up only (no show-up) + NOT in opt-in→ NLOW4,NLOW4-DDMMYY,NLOW2,NLOWDDMMYY
+  // Note the NOT-in-opt-in pair is un-hyphenated ("NLOW2" + "NLOWDDMMYY", e.g.
+  // "NLOW220826") — deliberately different from the NLOW3-/NLOW4- convention.
   const hasDate = ddmmyy.length === 6;
   const tagBaseSuffix = hasDate ? `,NLOW3-${ddmmyy}` : "";
-  const tagN2Suffix = hasDate ? `,NLOW2-${ddmmyy}` : "";
+  const tagN2Suffix = hasDate ? `,NLOW${ddmmyy}` : "";
   const tagN4Suffix = hasDate ? `,NLOW4-${ddmmyy}` : "";
 
   type WorkingRow = { first: string; email: string; phone: string; tags: string };

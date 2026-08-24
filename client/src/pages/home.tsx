@@ -1486,8 +1486,10 @@ function ReportView({
               registered with a different phone number or email. Fix the
               details below and the row will drop off this list once it
               matches. Everyone here gets tagged{" "}
+              <code className="text-[11px] bg-muted px-1 py-0.5 rounded">NLOW2</code>{" "}
+              and{" "}
               <code className="text-[11px] bg-muted px-1 py-0.5 rounded">
-                NLOW2-{ddmmyy(report.sessionDetails.sessionDate)}
+                NLOW{ddmmyy(report.sessionDetails.sessionDate)}
               </code>{" "}
               in the Keap Workings export.
             </p>
