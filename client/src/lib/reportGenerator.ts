@@ -203,6 +203,16 @@ interface TCRow {
   total: number;
   pricingOption: string;
   orderDate: string;
+  processor: "Stripe" | "PayPal";
+}
+
+/**
+ * ThriveCart's "processor" column names the actual payment gateway (e.g.
+ * "stripe", "paypal"). Defaults to Stripe when missing/unrecognized, since
+ * that's the processor ThriveCart uses for the vast majority of sales here.
+ */
+function normalizeProcessor(raw: string): "Stripe" | "PayPal" {
+  return raw.toLowerCase().includes("paypal") ? "PayPal" : "Stripe";
 }
 
 function parseTCRows(rows: Record<string, any>[]): TCRow[] {
@@ -225,6 +235,7 @@ function parseTCRows(rows: Record<string, any>[]): TCRow[] {
         total,
         pricingOption: getVal(r, ["relevant_item_pricing_option", "pricing_option", "Pricing Option"]),
         orderDate: getVal(r, ["order_date", "Order Date", "date"]),
+        processor: normalizeProcessor(getVal(r, ["processor", "Processor", "payment_processor", "gateway"])),
       };
     })
     .filter((r) => r.email);
@@ -417,7 +428,7 @@ export async function generateReport(
       phoneNumber: phoneLocal,
       fullPhone,
       country,
-      source: "TC",
+      source: r.processor,
       intake: extractIntake(r.pricingOption),
       pricingOption: r.pricingOption,
       total: r.total,
@@ -432,7 +443,8 @@ export async function generateReport(
   for (const r of bt) {
     const existing = r.email ? seenSignupEmails.get(r.email) : undefined;
     if (existing) {
-      existing.source = "TC+BT";
+      // Already recorded via ThriveCart — keep their Stripe/PayPal source
+      // rather than a separate combined category.
       continue;
     }
     // Same priority as TC: EW (cc+phone) → BT phone → Keap.

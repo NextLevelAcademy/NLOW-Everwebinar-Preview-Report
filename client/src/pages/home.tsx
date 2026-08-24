@@ -821,12 +821,12 @@ function DeleteRowButton({ onClick, testId }: { onClick: () => void; testId?: st
   );
 }
 
-const SIGN_UP_SOURCE_OPTIONS: SignUpRow["source"][] = ["TC", "BT", "TC+BT"];
+const SIGN_UP_SOURCE_OPTIONS: SignUpRow["source"][] = ["Stripe", "PayPal", "BT"];
 
 function sourceLabel(source: SignUpRow["source"]): string {
-  if (source === "BT") return "BT";
-  if (source === "TC+BT") return "TC + BT";
-  return "ThriveCart";
+  if (source === "PayPal") return "ThriveCart – PayPal";
+  if (source === "BT") return "Bank Transfer – PayNow";
+  return "ThriveCart – Stripe";
 }
 
 function OptInTable({

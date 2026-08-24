@@ -162,7 +162,7 @@ export interface SignUpRow {
   phoneNumber: string;
   fullPhone: string;
   country: CountryGroup;
-  source: "TC" | "BT" | "TC+BT";
+  source: "Stripe" | "PayPal" | "BT"; // Stripe/PayPal = ThriveCart, by processor; BT = Bank Transfer (PayNow)
   intake: string; // "May", "June", or other
   pricingOption: string;
   total: number;

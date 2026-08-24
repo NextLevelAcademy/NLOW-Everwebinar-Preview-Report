@@ -185,7 +185,7 @@ export function downloadExcelReport(report: ReportData): void {
 
   // ============ Sheet 4: Sign Up ============
   const sourceLabel = (src: SignUpRow["source"]) =>
-    src === "TC" ? "ThriveCart" : src === "BT" ? "Bank Transfer" : "ThriveCart+BT";
+    src === "Stripe" ? "ThriveCart – Stripe" : src === "PayPal" ? "ThriveCart – PayPal" : "Bank Transfer – PayNow";
   const signUpData = [
     ["Name", "Email", "Phone Number", "Country", "Source", "Intake", "Show up"],
     ...report.signUps.map((s) => [
@@ -306,9 +306,9 @@ export function downloadExcelReport(report: ReportData): void {
   //   Preview Date (session date long), Original Intake Selected (intake + workshop),
   //   Enrolment Date (order date long), Currency ("SGD"),
   //   Course Fee w GST (programPrice), Amount Paid (s.total),
-  //   Payment Gateway ("stripe" / "Bank Transfer" / "ThriveCart+BT").
+  //   Payment Gateway ("stripe" / "paypal" / "Bank Transfer").
   const gateway = (src: SignUpRow["source"]) =>
-    src === "TC" ? "stripe" : src === "BT" ? "Bank Transfer" : "ThriveCart+BT";
+    src === "Stripe" ? "stripe" : src === "PayPal" ? "paypal" : "Bank Transfer";
 
   // Convert orderDate to long form if it's parseable.
   const formatOrderDate = (raw: string): string => {
