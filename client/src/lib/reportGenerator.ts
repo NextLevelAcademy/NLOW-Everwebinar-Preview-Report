@@ -3,7 +3,6 @@ import type {
   OptInRow,
   ReportData,
   SessionDetails,
-  ShowUpNotInOptInRow,
   ShowUpRow,
   SignUpRow,
 } from "../../../shared/schema";
@@ -592,15 +591,8 @@ export async function generateReport(
     };
   });
 
-  const showUpsNotInOptIn: ShowUpNotInOptInRow[] = [];
   for (const su of showUpRows) {
     if (!su.inOptIn) {
-      showUpsNotInOptIn.push({
-        fullName: su.fullName,
-        email: su.email,
-        fullPhone: su.fullPhone,
-        country: su.country,
-      });
       // Append to opt-ins (matches "Opt In sheet" structure in the original)
       optInRows.push({
         firstName: su.firstName,
@@ -682,7 +674,7 @@ export async function generateReport(
   }
 
   // ===== Metrics and country breakdowns =====
-  const { metrics, optInByCountry, showUpByCountry, signUpByCountry } =
+  const { metrics, optInByCountry, showUpByCountry, signUpByCountry, showUpsNotInOptIn } =
     deriveMetrics(session, optInRows, showUpRows, signUpRows);
 
   return {

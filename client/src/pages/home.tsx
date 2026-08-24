@@ -678,6 +678,12 @@ function CountryTable({
   );
 }
 
+/** Compact DDMMYY form of the session date, for display next to Keap tag names. */
+function ddmmyy(sessionDate: string): string {
+  if (!sessionDate) return "DDMMYY";
+  return sessionDate.replace(/\D/g, "").padEnd(6, "").slice(0, 6) || "DDMMYY";
+}
+
 const COUNTRY_OPTIONS: (keyof CountryBreakdown)[] = [
   "SG", "MY", "USA", "HK", "OTHERS", "INVALID", "NA",
 ];
@@ -1335,6 +1341,19 @@ function ReportView({
     recompute({ sessionDetails: next });
   }
 
+  // Show-ups with no matching Keap opt-in email — likely registered with a
+  // different phone/email than they opted in with. Kept as {row, original
+  // index} pairs so edits made in this filtered view still write back to the
+  // right row in report.showUps (and, once corrected, the row disappears
+  // from this list on the next render since report.showUpsNotInOptIn is
+  // recomputed live).
+  const notInOptInEmails = new Set(
+    report.showUpsNotInOptIn.map((r) => (r.email || "").toLowerCase()).filter(Boolean)
+  );
+  const notInOptInEntries = report.showUps
+    .map((row, originalIndex) => ({ row, originalIndex }))
+    .filter(({ row }) => notInOptInEmails.has((row.email || "").toLowerCase()));
+
   const revenue = m.revenueTotal.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -1455,6 +1474,35 @@ function ReportView({
       <div className="mb-6">
         <ShowUpTable rows={report.showUps} onUpdate={updateShowUp} onDelete={deleteShowUp} />
       </div>
+
+      {notInOptInEntries.length > 0 && (
+        <div className="mb-6">
+          <div className="px-1 pb-2">
+            <h3 className="font-semibold text-sm text-foreground">
+              Show Up — Not in Opt-In ({notInOptInEntries.length})
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Showed up but no email match in the Keap opt-in list — likely
+              registered with a different phone number or email. Fix the
+              details below and the row will drop off this list once it
+              matches. Everyone here gets tagged{" "}
+              <code className="text-[11px] bg-muted px-1 py-0.5 rounded">
+                NLOW2-{ddmmyy(report.sessionDetails.sessionDate)}
+              </code>{" "}
+              in the Keap Workings export.
+            </p>
+          </div>
+          <ShowUpTable
+            rows={notInOptInEntries.map((e) => e.row)}
+            onUpdate={(filteredIdx, patch) =>
+              updateShowUp(notInOptInEntries[filteredIdx].originalIndex, patch)
+            }
+            onDelete={(filteredIdx) =>
+              deleteShowUp(notInOptInEntries[filteredIdx].originalIndex)
+            }
+          />
+        </div>
+      )}
 
       <div className="mb-6">
         <SignUpTable rows={report.signUps} onUpdate={updateSignUp} onDelete={deleteSignUp} />

@@ -221,8 +221,16 @@ export function downloadExcelReport(report: ReportData): void {
   const workings: WorkingRow[] = [];
   const handledEmails = new Set<string>();
 
+  // Use the live-recomputed "not in opt-in" list (report.showUpsNotInOptIn),
+  // not the frozen per-row inOptIn flag — if a mismatched email/phone was
+  // corrected on the report page after generation, that person's tags below
+  // need to reflect the fix instead of their original classification.
+  const notInOptInEmails = new Set(
+    report.showUpsNotInOptIn.map((r) => (r.email || "").toLowerCase()).filter(Boolean)
+  );
+
   for (const su of report.showUps) {
-    if (!su.inOptIn) continue;
+    if (notInOptInEmails.has((su.email || "").toLowerCase())) continue;
     const tags = su.signedUp
       ? `NLOW3${tagBaseSuffix},NLOW4${tagN4Suffix}`
       : `NLOW3${tagBaseSuffix}`;
