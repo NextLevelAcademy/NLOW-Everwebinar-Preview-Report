@@ -2,72 +2,18 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, Download, Loader2, Send } from "lucide-react";
+import { AlertCircle, Download } from "lucide-react";
 import { downloadWatiCsv, type BroadcastBuild } from "@/lib/watiBroadcast";
-import { apiRequest } from "@/lib/queryClient";
-
-type SendResponse = {
-  ok: boolean;
-  sentCount: number;
-  failedCount: number;
-  total: number;
-  failures?: { whatsappNumber: string; name: string; error?: string }[];
-  error?: string;
-};
 
 export function BroadcastPanel({ build }: { build: BroadcastBuild }) {
-  const { toast } = useToast();
   const [broadcastName, setBroadcastName] = useState(
     `${build.definition.defaultBroadcastName}_${dateSuffix()}`,
   );
-  const [sending, setSending] = useState(false);
-  const [lastResult, setLastResult] = useState<SendResponse | null>(null);
 
   const empty = build.contacts.length === 0;
 
   // Resolve banner path to an absolute URL (WATI must be able to fetch it).
   const bannerPath = build.definition.bannerPath;
-  const mediaUrl = bannerPath
-    ? `${window.location.origin}${bannerPath}`
-    : undefined;
-
-  async function doSend() {
-    setSending(true);
-    try {
-      const res = await apiRequest("POST", "/api/wati/send-broadcast", {
-        broadcastType: build.type,
-        templateName: build.definition.templateName,
-        broadcastName,
-        contacts: build.contacts,
-        ...(mediaUrl ? { mediaUrl } : {}),
-      });
-      const data = (await res.json()) as SendResponse;
-      if (!data.ok && data.sentCount === 0) {
-        throw new Error(data.error || "Send failed");
-      }
-      setLastResult(data);
-      toast({
-        title: data.ok ? "Broadcast sent" : "Broadcast partially sent",
-        description: `${data.sentCount}/${data.total} delivered${
-          data.failedCount > 0 ? ` · ${data.failedCount} failed` : ""
-        }`,
-        variant: data.ok ? "default" : "destructive",
-      });
-      // Reset the name so the next send gets a fresh default.
-      setBroadcastName(
-        `${build.definition.defaultBroadcastName}_${dateSuffix()}`,
-      );
-    } catch (err: any) {
-      toast({
-        title: "Send failed",
-        description: err?.message ?? "Unknown error",
-        variant: "destructive",
-      });
-    } finally {
-      setSending(false);
-    }
-  }
 
   return (
     <div className="space-y-4">
@@ -201,7 +147,7 @@ export function BroadcastPanel({ build }: { build: BroadcastBuild }) {
           </div>
           {build.contacts.length > 200 && (
             <div className="px-3 py-2 text-xs text-muted-foreground border-t border-border bg-muted/40">
-              Showing first 200 of {build.contacts.length} — all will be sent.
+              Showing first 200 of {build.contacts.length} — all are included in the download.
             </div>
           )}
         </div>
@@ -210,36 +156,6 @@ export function BroadcastPanel({ build }: { build: BroadcastBuild }) {
       {empty && (
         <div className="p-6 text-center text-sm text-muted-foreground border border-dashed border-border rounded-md">
           No contacts match this broadcast.
-        </div>
-      )}
-
-      {/* Last send confirmation */}
-      {lastResult && (
-        <div
-          className="p-3 rounded-md border border-primary/30 bg-primary/5 text-sm flex items-start gap-2"
-          data-testid="send-result"
-        >
-          <Send className="h-4 w-4 text-primary mt-0.5" />
-          <div>
-            <div>
-              <strong>{lastResult.sentCount}</strong> of{" "}
-              <strong>{lastResult.total}</strong> messages dispatched
-              {lastResult.failedCount > 0 && (
-                <>
-                  {" "}
-                  · <span className="text-destructive">
-                    {lastResult.failedCount} failed
-                  </span>
-                </>
-              )}
-            </div>
-            {lastResult.failures && lastResult.failures.length > 0 && (
-              <div className="text-xs text-muted-foreground mt-1">
-                First failure: {lastResult.failures[0].name} —{" "}
-                {lastResult.failures[0].error}
-              </div>
-            )}
-          </div>
         </div>
       )}
 
@@ -253,23 +169,6 @@ export function BroadcastPanel({ build }: { build: BroadcastBuild }) {
         >
           <Download className="h-4 w-4 mr-2" />
           Download CSV
-        </Button>
-        <Button
-          onClick={doSend}
-          disabled={empty || !broadcastName.trim() || sending}
-          data-testid={`button-send-${build.type}`}
-        >
-          {sending ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Sending...
-            </>
-          ) : (
-            <>
-              <Send className="h-4 w-4 mr-2" />
-              Send Broadcast
-            </>
-          )}
         </Button>
       </div>
     </div>
