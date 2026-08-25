@@ -3,9 +3,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertCircle, Download } from "lucide-react";
-import { downloadWatiCsv, type BroadcastBuild } from "@/lib/watiBroadcast";
+import {
+  downloadWatiCsv,
+  type BroadcastBuild,
+  type ContactPatch,
+  type WatiSourceType,
+} from "@/lib/watiBroadcast";
+import { DeleteRowButton, EditableText } from "@/components/EditableCell";
 
-export function BroadcastPanel({ build }: { build: BroadcastBuild }) {
+export function BroadcastPanel({
+  build,
+  sourceType,
+  onUpdateContact,
+  onDeleteContact,
+}: {
+  build: BroadcastBuild;
+  sourceType: WatiSourceType;
+  onUpdateContact: (sourceType: WatiSourceType, currentEmail: string, patch: ContactPatch) => void;
+  onDeleteContact: (sourceType: WatiSourceType, email: string) => void;
+}) {
   const [broadcastName, setBroadcastName] = useState(
     `${build.definition.defaultBroadcastName}_${dateSuffix()}`,
   );
@@ -115,33 +131,66 @@ export function BroadcastPanel({ build }: { build: BroadcastBuild }) {
       {/* Recipient preview table */}
       {!empty && (
         <div className="border border-border rounded-md overflow-hidden">
+          <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border bg-muted/40">
+            Click any cell to edit — changes are saved to the matching Opt-In / Show Up / Sign Up row.
+          </div>
           <div className="max-h-72 overflow-y-auto">
             <table className="w-full text-sm">
-              <thead className="bg-muted text-muted-foreground text-xs uppercase tracking-wide">
+              <thead className="bg-muted text-muted-foreground text-xs uppercase tracking-wide sticky top-0">
                 <tr>
                   <th className="text-left px-3 py-2 font-medium">Name</th>
                   <th className="text-left px-3 py-2 font-medium">Country Code</th>
                   <th className="text-left px-3 py-2 font-medium">Phone</th>
                   <th className="text-left px-3 py-2 font-medium">Email</th>
+                  <th className="text-left px-3 py-2 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
-                {build.contacts.slice(0, 200).map((c, i) => (
-                  <tr
-                    key={`${c.countryCode}${c.phone}-${i}`}
-                    className="border-t border-border"
-                    data-testid={`row-contact-${i}`}
-                  >
-                    <td className="px-3 py-2">{c.name}</td>
-                    <td className="px-3 py-2 font-mono text-xs">
-                      {c.countryCode}
-                    </td>
-                    <td className="px-3 py-2 font-mono text-xs">{c.phone}</td>
-                    <td className="px-3 py-2 text-muted-foreground text-xs truncate max-w-[200px]">
-                      {c.email}
-                    </td>
-                  </tr>
-                ))}
+                {build.contacts.slice(0, 200).map((c, i) => {
+                  const currentEmail = c.email || "";
+                  return (
+                    <tr
+                      key={`${c.countryCode}${c.phone}-${i}`}
+                      className="border-t border-border"
+                      data-testid={`row-contact-${i}`}
+                    >
+                      <td className="px-3 py-1">
+                        <EditableText
+                          value={c.name}
+                          onCommit={(v) => onUpdateContact(sourceType, currentEmail, { name: v })}
+                          testId={`contact-name-${build.type}-${i}`}
+                        />
+                      </td>
+                      <td className="px-3 py-1 font-mono text-xs">
+                        <EditableText
+                          value={c.countryCode}
+                          onCommit={(v) => onUpdateContact(sourceType, currentEmail, { countryCode: v })}
+                          testId={`contact-cc-${build.type}-${i}`}
+                        />
+                      </td>
+                      <td className="px-3 py-1 font-mono text-xs">
+                        <EditableText
+                          value={c.phone}
+                          onCommit={(v) => onUpdateContact(sourceType, currentEmail, { phone: v })}
+                          testId={`contact-phone-${build.type}-${i}`}
+                        />
+                      </td>
+                      <td className="px-3 py-1 text-muted-foreground text-xs">
+                        <EditableText
+                          value={currentEmail}
+                          onCommit={(v) => onUpdateContact(sourceType, currentEmail, { email: v })}
+                          testId={`contact-email-${build.type}-${i}`}
+                        />
+                      </td>
+                      <td className="px-3 py-1">
+                        <DeleteRowButton
+                          onClick={() => onDeleteContact(sourceType, currentEmail)}
+                          testId={`contact-delete-${build.type}-${i}`}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

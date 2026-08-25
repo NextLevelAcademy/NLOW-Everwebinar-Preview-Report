@@ -10,6 +10,17 @@ import type {
 } from "../../../shared/schema";
 import { isValidForBroadcast, normalizePhone } from "./phone";
 
+// Which report.* array a WATI broadcast tab's contacts are derived from —
+// used to route contact edits/deletes back to the right source table (see
+// updateBroadcastContact/deleteBroadcastContact in pages/home.tsx).
+export type WatiSourceType = "optIns" | "showUps" | "signUps";
+export type ContactPatch = {
+  name?: string;
+  countryCode?: string;
+  phone?: string;
+  email?: string;
+};
+
 export interface BroadcastDefinition {
   type: BroadcastType;
   label: string;

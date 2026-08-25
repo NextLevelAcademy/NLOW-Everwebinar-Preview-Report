@@ -17,8 +17,15 @@ import {
   type UploadedFiles,
 } from "@/lib/reportGenerator";
 import { downloadExcelReport } from "@/lib/excelExport";
-import { buildBroadcasts } from "@/lib/watiBroadcast";
+import { buildBroadcasts, type ContactPatch, type WatiSourceType } from "@/lib/watiBroadcast";
 import { BroadcastPanel } from "@/components/BroadcastPanel";
+import {
+  CountrySelect,
+  DeleteRowButton,
+  EditableBool,
+  EditableNumber,
+  EditableText,
+} from "@/components/EditableCell";
 import { deriveMetrics } from "@/lib/deriveMetrics";
 import type {
   CountryBreakdown,
@@ -684,142 +691,6 @@ function ddmmyy(sessionDate: string): string {
   return sessionDate.replace(/\D/g, "").padEnd(6, "").slice(0, 6) || "DDMMYY";
 }
 
-const COUNTRY_OPTIONS: (keyof CountryBreakdown)[] = [
-  "SG", "MY", "USA", "HK", "OTHERS", "INVALID", "NA",
-];
-
-/** Inline-editable text cell — click to edit, blur/Enter to commit. */
-function EditableText({
-  value,
-  onCommit,
-  className,
-  placeholder,
-  testId,
-}: {
-  value: string;
-  onCommit: (next: string) => void;
-  className?: string;
-  placeholder?: string;
-  testId?: string;
-}) {
-  return (
-    <input
-      type="text"
-      defaultValue={value}
-      key={value}
-      placeholder={placeholder}
-      data-testid={testId}
-      onBlur={(e) => {
-        if (e.target.value !== value) onCommit(e.target.value);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-      }}
-      className={[
-        "w-full bg-transparent border border-transparent rounded px-1 py-0.5 -mx-1 hover:border-border focus:border-primary focus:outline-none focus:bg-background transition-colors",
-        className || "",
-      ].join(" ")}
-    />
-  );
-}
-
-/** Inline-editable number cell. */
-function EditableNumber({
-  value,
-  onCommit,
-  className,
-  testId,
-}: {
-  value: number;
-  onCommit: (next: number) => void;
-  className?: string;
-  testId?: string;
-}) {
-  return (
-    <input
-      type="number"
-      defaultValue={value}
-      key={value}
-      data-testid={testId}
-      onBlur={(e) => {
-        const next = Number(e.target.value) || 0;
-        if (next !== value) onCommit(next);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-      }}
-      className={[
-        "w-full bg-transparent border border-transparent rounded px-1 py-0.5 -mx-1 hover:border-border focus:border-primary focus:outline-none focus:bg-background transition-colors tabular-nums",
-        className || "",
-      ].join(" ")}
-    />
-  );
-}
-
-/** Inline country dropdown — the primary way to correct/override a valid vs. INVALID classification. */
-function CountrySelect({
-  value,
-  onCommit,
-  testId,
-}: {
-  value: string;
-  onCommit: (next: keyof CountryBreakdown) => void;
-  testId?: string;
-}) {
-  return (
-    <select
-      value={value}
-      data-testid={testId}
-      onChange={(e) => onCommit(e.target.value as keyof CountryBreakdown)}
-      className={[
-        "text-[10px] font-medium rounded px-1 py-0.5 border focus:outline-none focus:ring-1 focus:ring-primary/50",
-        value === "INVALID"
-          ? "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 border-red-300 dark:border-red-800"
-          : "bg-muted text-foreground border-transparent hover:border-border",
-      ].join(" ")}
-    >
-      {COUNTRY_OPTIONS.map((c) => (
-        <option key={c} value={c}>
-          {c}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-/** Inline boolean toggle rendered as a small checkbox. */
-function EditableBool({
-  checked,
-  onCommit,
-  testId,
-}: {
-  checked: boolean;
-  onCommit: (next: boolean) => void;
-  testId?: string;
-}) {
-  return (
-    <input
-      type="checkbox"
-      checked={checked}
-      data-testid={testId}
-      onChange={(e) => onCommit(e.target.checked)}
-      className="w-3.5 h-3.5 accent-primary cursor-pointer"
-    />
-  );
-}
-
-function DeleteRowButton({ onClick, testId }: { onClick: () => void; testId?: string }) {
-  return (
-    <button
-      onClick={onClick}
-      data-testid={testId}
-      title="Remove row"
-      className="text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors px-1"
-    >
-      ×
-    </button>
-  );
-}
 
 const SIGN_UP_SOURCE_OPTIONS: SignUpRow["source"][] = ["Stripe", "PayPal", "BT"];
 
@@ -1185,7 +1056,15 @@ function SignUpTable({
 
 // (ShowUpsNotInOptInSection removed per user request — internal data still drives Keap tagging)
 
-function WatiSection({ broadcasts }: { broadcasts: ReturnType<typeof buildBroadcasts> }) {
+function WatiSection({
+  broadcasts,
+  onUpdateContact,
+  onDeleteContact,
+}: {
+  broadcasts: ReturnType<typeof buildBroadcasts>;
+  onUpdateContact: (sourceType: WatiSourceType, currentEmail: string, patch: ContactPatch) => void;
+  onDeleteContact: (sourceType: WatiSourceType, email: string) => void;
+}) {
   // Tab keys: "welcome:<index>" for each dynamic welcome, or "no_show".
   const welcomeKeys = broadcasts.welcomes.map((_, i) => `welcome:${i}`);
   const defaultTab = welcomeKeys[0] ?? "no_show";
@@ -1271,13 +1150,28 @@ function WatiSection({ broadcasts }: { broadcasts: ReturnType<typeof buildBroadc
             <BroadcastPanel
               key={`welcome:${activeWelcomeIdx}:${broadcasts.welcomes[activeWelcomeIdx].vwLabel ?? ""}`}
               build={broadcasts.welcomes[activeWelcomeIdx]}
+              sourceType="signUps"
+              onUpdateContact={onUpdateContact}
+              onDeleteContact={onDeleteContact}
             />
           )}
           {tab === "no_show" && (
-            <BroadcastPanel key="no_show" build={broadcasts.no_show} />
+            <BroadcastPanel
+              key="no_show"
+              build={broadcasts.no_show}
+              sourceType="optIns"
+              onUpdateContact={onUpdateContact}
+              onDeleteContact={onDeleteContact}
+            />
           )}
           {tab === "showup_no_buy" && (
-            <BroadcastPanel key="showup_no_buy" build={broadcasts.showup_no_buy} />
+            <BroadcastPanel
+              key="showup_no_buy"
+              build={broadcasts.showup_no_buy}
+              sourceType="showUps"
+              onUpdateContact={onUpdateContact}
+              onDeleteContact={onDeleteContact}
+            />
           )}
         </div>
       </div>
@@ -1345,6 +1239,88 @@ function ReportView({
   function deleteSignUp(idx: number) {
     recompute({ signUps: report.signUps.filter((_, i) => i !== idx) });
   }
+  // WATI broadcast contact editing. Each broadcast tab's contact list is a
+  // derived, filtered/deduped view over report.optIns / report.showUps /
+  // report.signUps (see buildBroadcasts in watiBroadcast.ts) — there's no
+  // separate storage for it. So editing a contact here looks the person up
+  // by email in the matching source table and writes the edit through the
+  // same updateX/deleteX used by the main tables, exactly like editing them
+  // there directly. The broadcast list then re-derives on next render.
+  function updateBroadcastContact(
+    sourceType: WatiSourceType,
+    currentEmail: string,
+    patch: ContactPatch
+  ) {
+    const emailLc = currentEmail.toLowerCase();
+    if (sourceType === "optIns") {
+      const idx = report.optIns.findIndex((r) => (r.email || "").toLowerCase() === emailLc);
+      if (idx === -1) return;
+      const cur = report.optIns[idx];
+      const rowPatch: Partial<OptInRow> = {};
+      if (patch.name !== undefined) {
+        rowPatch.fullName = patch.name;
+        rowPatch.firstName = patch.name;
+        rowPatch.lastName = "";
+      }
+      if (patch.email !== undefined) rowPatch.email = patch.email;
+      if (patch.countryCode !== undefined || patch.phone !== undefined) {
+        const cc = patch.countryCode ?? cur.countryCode;
+        const ph = patch.phone ?? cur.phoneNumber;
+        rowPatch.countryCode = cc;
+        rowPatch.phoneNumber = ph;
+        rowPatch.fullPhone = `${cc}${ph}`;
+      }
+      updateOptIn(idx, rowPatch);
+    } else if (sourceType === "showUps") {
+      const idx = report.showUps.findIndex((r) => (r.email || "").toLowerCase() === emailLc);
+      if (idx === -1) return;
+      const cur = report.showUps[idx];
+      const rowPatch: Partial<ShowUpRow> = {};
+      if (patch.name !== undefined) {
+        rowPatch.fullName = patch.name;
+        rowPatch.firstName = patch.name;
+        rowPatch.lastName = "";
+      }
+      if (patch.email !== undefined) rowPatch.email = patch.email;
+      if (patch.countryCode !== undefined || patch.phone !== undefined) {
+        const cc = patch.countryCode ?? cur.countryCode;
+        const ph = patch.phone ?? cur.phoneNumber;
+        rowPatch.countryCode = cc;
+        rowPatch.phoneNumber = ph;
+        rowPatch.fullPhone = `${cc}${ph}`;
+      }
+      updateShowUp(idx, rowPatch);
+    } else {
+      const idx = report.signUps.findIndex((r) => (r.email || "").toLowerCase() === emailLc);
+      if (idx === -1) return;
+      const cur = report.signUps[idx];
+      const rowPatch: Partial<SignUpRow> = {};
+      if (patch.name !== undefined) rowPatch.fullName = patch.name;
+      if (patch.email !== undefined) rowPatch.email = patch.email;
+      if (patch.countryCode !== undefined || patch.phone !== undefined) {
+        const cc = patch.countryCode ?? cur.countryCode;
+        const ph = patch.phone ?? cur.phoneNumber;
+        rowPatch.countryCode = cc;
+        rowPatch.phoneNumber = ph;
+        rowPatch.fullPhone = `${cc}${ph}`;
+      }
+      updateSignUp(idx, rowPatch);
+    }
+  }
+  function deleteBroadcastContact(sourceType: WatiSourceType, email: string) {
+    const emailLc = email.toLowerCase();
+    if (sourceType === "optIns") {
+      const idx = report.optIns.findIndex((r) => (r.email || "").toLowerCase() === emailLc);
+      if (idx !== -1) deleteOptIn(idx);
+    } else if (sourceType === "showUps") {
+      const idx = report.showUps.findIndex((r) => (r.email || "").toLowerCase() === emailLc);
+      if (idx !== -1) deleteShowUp(idx);
+    } else {
+      const idx = report.signUps.findIndex((r) => (r.email || "").toLowerCase() === emailLc);
+      if (idx !== -1) deleteSignUp(idx);
+    }
+  }
+
   function updateSessionDetails(next: SessionDetails) {
     recompute({ sessionDetails: next });
   }
@@ -1518,7 +1494,11 @@ function ReportView({
         <SignUpTable rows={report.signUps} onUpdate={updateSignUp} onDelete={deleteSignUp} />
       </div>
 
-      <WatiSection broadcasts={broadcasts} />
+      <WatiSection
+        broadcasts={broadcasts}
+        onUpdateContact={updateBroadcastContact}
+        onDeleteContact={deleteBroadcastContact}
+      />
     </main>
   );
 }
