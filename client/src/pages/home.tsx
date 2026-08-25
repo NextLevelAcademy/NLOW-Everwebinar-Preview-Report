@@ -1350,7 +1350,7 @@ function ReportView({
     <main className="max-w-6xl mx-auto px-6 py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold">NLOW Everwebinar Preview Report</h1>
-        <p className="text-base text-muted-foreground">by Bjorn Ng</p>
+        <p className="text-base text-muted-foreground">by {session.speaker || "—"}</p>
         <p className="text-sm font-bold text-primary mt-1">
           Program Price: SGD{" "}
           {session.programPrice.toLocaleString("en-US", {
