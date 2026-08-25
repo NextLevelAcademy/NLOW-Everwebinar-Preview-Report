@@ -1194,7 +1194,7 @@ function WatiSection({ broadcasts }: { broadcasts: ReturnType<typeof buildBroadc
   // If VW entries change (added/removed/edited) and the current tab no longer
   // exists, fall back to the first available tab.
   useEffect(() => {
-    const validKeys = new Set<string>([...welcomeKeys, "no_show"]);
+    const validKeys = new Set<string>([...welcomeKeys, "no_show", "showup_no_buy"]);
     if (!validKeys.has(tab)) {
       setTab(defaultTab);
     }
@@ -1261,6 +1261,11 @@ function WatiSection({ broadcasts }: { broadcasts: ReturnType<typeof buildBroadc
               "No-Show Follow-Up",
               broadcasts.no_show.contacts.length
             )}
+            {tabBtn(
+              "showup_no_buy",
+              "Sales Follow-Up",
+              broadcasts.showup_no_buy.contacts.length
+            )}
           </div>
           {activeWelcomeIdx >= 0 && broadcasts.welcomes[activeWelcomeIdx] && (
             <BroadcastPanel
@@ -1270,6 +1275,9 @@ function WatiSection({ broadcasts }: { broadcasts: ReturnType<typeof buildBroadc
           )}
           {tab === "no_show" && (
             <BroadcastPanel key="no_show" build={broadcasts.no_show} />
+          )}
+          {tab === "showup_no_buy" && (
+            <BroadcastPanel key="showup_no_buy" build={broadcasts.showup_no_buy} />
           )}
         </div>
       </div>
