@@ -8,7 +8,7 @@ import type {
   VWDateEntry,
   WatiContact,
 } from "../../../shared/schema";
-import { isValidForBroadcast, normalizePhone } from "./phone";
+import { normalizePhone } from "./phone";
 
 // Which report.* array a WATI broadcast tab's contacts are derived from —
 // used to route contact edits/deletes back to the right source table (see
@@ -59,7 +59,6 @@ export interface BroadcastBuild {
   type: BroadcastType | string; // welcome builds use a synthetic id like "welcome:may"
   definition: BroadcastDefinition;
   contacts: WatiContact[];
-  excluded: { name: string; email: string; reason: string }[];
   // Populated only for no_show. Count of opt-ins filtered out via the
   // uploaded Tag 4 List CSV (NLOW4 contacts).
   nlow4ExcludedCount?: number;
@@ -184,18 +183,9 @@ function optInsToBroadcast(
 ): BroadcastBuild {
   const definition = BROADCASTS[type];
   const contacts: WatiContact[] = [];
-  const excluded: { name: string; email: string; reason: string }[] = [];
 
   for (const r of rows) {
     const np = normalizePhone(r.phoneNumber || r.fullPhone, r.countryCode);
-    if (!isValidForBroadcast(np)) {
-      excluded.push({
-        name: r.fullName,
-        email: r.email,
-        reason: !np.phone ? "Missing phone" : "Invalid country code",
-      });
-      continue;
-    }
     contacts.push({
       name: r.fullName || r.email || "Customer",
       countryCode: np.countryCode,
@@ -206,6 +196,9 @@ function optInsToBroadcast(
     });
   }
 
+  // Dedupe by full phone — avoids double-messaging the same WhatsApp number
+  // within one broadcast. Not a validity check: rows with no/invalid phone
+  // are still included so they can be reviewed and fixed manually.
   const seen = new Set<string>();
   const dedup = contacts.filter((c) => {
     const key = `${c.countryCode}${c.phone}`;
@@ -214,7 +207,7 @@ function optInsToBroadcast(
     return true;
   });
 
-  return { type, definition, contacts: dedup, excluded };
+  return { type, definition, contacts: dedup };
 }
 
 function signUpsToBroadcastWithDefinition(
@@ -223,18 +216,9 @@ function signUpsToBroadcastWithDefinition(
 ): BroadcastBuild {
   const type = definition.type;
   const contacts: WatiContact[] = [];
-  const excluded: { name: string; email: string; reason: string }[] = [];
 
   for (const r of rows) {
     const np = normalizePhone(r.phoneNumber || r.fullPhone, r.countryCode);
-    if (!isValidForBroadcast(np)) {
-      excluded.push({
-        name: r.fullName,
-        email: r.email,
-        reason: !np.phone ? "Missing phone" : "Invalid country code",
-      });
-      continue;
-    }
     contacts.push({
       name: r.fullName || r.email || "Customer",
       countryCode: np.countryCode,
@@ -246,7 +230,7 @@ function signUpsToBroadcastWithDefinition(
     });
   }
 
-  // Dedupe by full phone
+  // Dedupe by full phone (see note above).
   const seen = new Set<string>();
   const dedup = contacts.filter((c) => {
     const key = `${c.countryCode}${c.phone}`;
@@ -255,7 +239,7 @@ function signUpsToBroadcastWithDefinition(
     return true;
   });
 
-  return { type, definition, contacts: dedup, excluded };
+  return { type, definition, contacts: dedup };
 }
 
 function showUpsToBroadcast(
@@ -264,18 +248,9 @@ function showUpsToBroadcast(
 ): BroadcastBuild {
   const definition = BROADCASTS[type];
   const contacts: WatiContact[] = [];
-  const excluded: { name: string; email: string; reason: string }[] = [];
 
   for (const r of rows) {
     const np = normalizePhone(r.phoneNumber || r.fullPhone, r.countryCode);
-    if (!isValidForBroadcast(np)) {
-      excluded.push({
-        name: r.fullName,
-        email: r.email,
-        reason: !np.phone ? "Missing phone" : "Invalid country code",
-      });
-      continue;
-    }
     contacts.push({
       name: r.fullName || r.email || "Attendee",
       countryCode: np.countryCode,
@@ -286,6 +261,7 @@ function showUpsToBroadcast(
     });
   }
 
+  // Dedupe by full phone (see note above).
   const seen = new Set<string>();
   const dedup = contacts.filter((c) => {
     const key = `${c.countryCode}${c.phone}`;
@@ -294,7 +270,7 @@ function showUpsToBroadcast(
     return true;
   });
 
-  return { type, definition, contacts: dedup, excluded };
+  return { type, definition, contacts: dedup };
 }
 
 // Download CSV in WATI's exact format: Name, CountryCode, Phone, AllowCampaign, AllowSMS

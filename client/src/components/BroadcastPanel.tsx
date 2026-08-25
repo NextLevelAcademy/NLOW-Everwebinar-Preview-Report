@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, Download } from "lucide-react";
+import { Download } from "lucide-react";
 import {
   downloadWatiCsv,
   type BroadcastBuild,
@@ -104,29 +104,6 @@ export function BroadcastPanel({
           data-testid={`input-broadcast-name-${build.type}`}
         />
       </div>
-
-      {/* Excluded warning */}
-      {build.excluded.length > 0 && (
-        <div className="p-3 rounded-md border border-destructive/30 bg-destructive/5 flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-          <div className="text-xs">
-            <div className="font-medium text-destructive">
-              {build.excluded.length} contact
-              {build.excluded.length === 1 ? "" : "s"} excluded
-            </div>
-            <div className="text-muted-foreground mt-0.5">
-              {build.excluded.slice(0, 3).map((e, i) => (
-                <span key={i}>
-                  {i > 0 && " · "}
-                  {e.name || e.email} ({e.reason})
-                </span>
-              ))}
-              {build.excluded.length > 3 &&
-                ` · +${build.excluded.length - 3} more`}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Recipient preview table */}
       {!empty && (
