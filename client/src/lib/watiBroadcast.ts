@@ -42,7 +42,7 @@ export const BROADCASTS: Record<Exclude<BroadcastType, "may_signups" | "june_sig
     label: "Showed Up — No Sign-Up",
     description:
       "Attended live but did not sign up. Sales follow-up template.",
-    templateName: "nlow_tues_sales_fu_270226",
+    templateName: "Drip Campaign",
     defaultBroadcastName: "NLOW_ShowUp_NoBuy_Followup",
   },
   no_show: {
