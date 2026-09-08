@@ -2,11 +2,12 @@ import type { Express } from "express";
 import type { Server } from "node:http";
 import { sendBroadcastSchema, type WatiContact } from "../shared/schema";
 
-// WATI credentials — provided by user
-const WATI_BEARER =
-  process.env.WATI_BEARER ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6ImFkZWxpbmVAdGhlbmV4dGx2bC5jbyIsIm5hbWVpZCI6ImFkZWxpbmVAdGhlbmV4dGx2bC5jbyIsImVtYWlsIjoiYWRlbGluZUB0aGVuZXh0bHZsLmNvIiwiYXV0aF90aW1lIjoiMDUvMDgvMjAyNiAxMjoyMTo0MCIsInRlbmFudF9pZCI6Ijg2ODYiLCJkYl9uYW1lIjoibXQtcHJvZC1UZW5hbnRzIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQURNSU5JU1RSQVRPUiIsImV4cCI6MjUzNDAyMzAwODAwLCJpc3MiOiJDbGFyZV9BSSIsImF1ZCI6IkNsYXJlX0FJIn0.p3UZeY9VaroqfLLjidtwGovbFDlL5kU_syFXy9cn27k";
-const WATI_BASE_URL = "https://live-mt-server.wati.io/8686";
+// WATI credentials — set via environment variables (see .env.example).
+// Never hardcode the bearer token here: it's a live secret for the WATI
+// account and must not end up committed to a public repo.
+const WATI_BEARER = process.env.WATI_BEARER;
+const WATI_BASE_URL =
+  process.env.WATI_BASE_URL || "https://live-mt-server.wati.io/8686";
 
 // Safety: when WATI_MOCK is set, do NOT call the real WATI API for ANY contact.
 // Every send short-circuits to a mock OK so QA never hits live infrastructure.
@@ -133,6 +134,12 @@ export async function registerRoutes(
 
   // === Immediate-send broadcast ===
   app.post("/api/wati/send-broadcast", async (req, res) => {
+    if (!WATI_MOCK && !WATI_BEARER) {
+      return res.status(500).json({
+        ok: false,
+        error: "WATI_BEARER is not configured on the server. Set it in your environment (see .env.example).",
+      });
+    }
     const parsed = sendBroadcastSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({
