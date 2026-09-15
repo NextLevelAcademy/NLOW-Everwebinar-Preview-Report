@@ -181,17 +181,35 @@ interface EWRow {
   timeInRoom: string;
 }
 
+// EverWebinar's "Time in live room" is "hh:mm:ss" (e.g. "01:43:29").
+function parseHmsToMinutes(hms: string): number {
+  const parts = (hms || "").split(":").map((p) => parseInt(p, 10));
+  if (parts.some((p) => Number.isNaN(p))) return 0;
+  const [h = 0, m = 0, s = 0] = parts.length === 3 ? parts : [0, ...parts];
+  return h * 60 + m + s / 60;
+}
+
+// A join that lasted MIN_SHOWUP_MINUTES or less isn't a real show-up, so
+// it's tagged as a no-show everywhere downstream even if EverWebinar's own
+// "Attended live" column says Yes.
+const MIN_SHOWUP_MINUTES = 10;
+
 function parseEWRows(rows: Record<string, any>[]): EWRow[] {
   return rows
-    .map((r) => ({
-      first: getVal(r, ["First name", "First Name", "FirstName"]),
-      last: getVal(r, ["Last name", "Last Name", "LastName"]),
-      email: getVal(r, ["Email", "Email Address"]).toLowerCase(),
-      cc: getVal(r, ["Phone country code", "Country code", "PhoneCountryCode"]),
-      phone: getVal(r, ["Phone number", "Phone", "PhoneNumber"]),
-      attendedLive: /yes|true|1/i.test(getVal(r, ["Attended live", "AttendedLive"])),
-      timeInRoom: getVal(r, ["Time in live room", "Time in Room", "TimeInRoom"]),
-    }))
+    .map((r) => {
+      const rawAttended = /yes|true|1/i.test(getVal(r, ["Attended live", "AttendedLive"]));
+      const timeInRoom = getVal(r, ["Time in live room", "Time in Room", "TimeInRoom"]);
+      const timeInRoomMinutes = parseHmsToMinutes(timeInRoom);
+      return {
+        first: getVal(r, ["First name", "First Name", "FirstName"]),
+        last: getVal(r, ["Last name", "Last Name", "LastName"]),
+        email: getVal(r, ["Email", "Email Address"]).toLowerCase(),
+        cc: getVal(r, ["Phone country code", "Country code", "PhoneCountryCode"]),
+        phone: getVal(r, ["Phone number", "Phone", "PhoneNumber"]),
+        attendedLive: rawAttended && timeInRoomMinutes > MIN_SHOWUP_MINUTES,
+        timeInRoom,
+      };
+    })
     .filter((r) => r.email || r.phone);
 }
 
