@@ -189,9 +189,9 @@ function parseHmsToMinutes(hms: string): number {
   return h * 60 + m + s / 60;
 }
 
-// A join that lasted MIN_SHOWUP_MINUTES or less isn't a real show-up, so
-// it's tagged as a no-show everywhere downstream even if EverWebinar's own
-// "Attended live" column says Yes.
+// A join that lasted under MIN_SHOWUP_MINUTES isn't a real show-up (exactly
+// MIN_SHOWUP_MINUTES still counts), so it's tagged as a no-show everywhere
+// downstream even if EverWebinar's own "Attended live" column says Yes.
 const MIN_SHOWUP_MINUTES = 10;
 
 function parseEWRows(rows: Record<string, any>[]): EWRow[] {
@@ -206,7 +206,7 @@ function parseEWRows(rows: Record<string, any>[]): EWRow[] {
         email: getVal(r, ["Email", "Email Address"]).toLowerCase(),
         cc: getVal(r, ["Phone country code", "Country code", "PhoneCountryCode"]),
         phone: getVal(r, ["Phone number", "Phone", "PhoneNumber"]),
-        attendedLive: rawAttended && timeInRoomMinutes > MIN_SHOWUP_MINUTES,
+        attendedLive: rawAttended && timeInRoomMinutes >= MIN_SHOWUP_MINUTES,
         timeInRoom,
       };
     })
