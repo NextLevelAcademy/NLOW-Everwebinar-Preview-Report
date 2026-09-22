@@ -138,7 +138,7 @@ export interface OptInRow {
   country: CountryGroup;
   showedUp: boolean; // matched in show up by email
   signedUp: boolean; // matched in sign up by email
-  source: "keap" | "showup_only" | "signup_only"; // showup_only = appended at bottom of opt-in sheet; signup_only = a sign-up unmatched to either
+  source: "keap" | "showup_only"; // showup_only = appended at bottom of opt-in sheet
 }
 
 export interface ShowUpRow {

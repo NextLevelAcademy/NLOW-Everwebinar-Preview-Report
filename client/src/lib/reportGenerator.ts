@@ -437,7 +437,10 @@ export async function generateReport(
     } else {
       country = detectCountryFromFullPhone(fullPhone);
     }
-    const showedUp = ewByEmail.has(r.email) && ewByEmail.get(r.email)!.attendedLive;
+    // Signing up requires having been live for the pitch, so a sign-up
+    // always counts as a show-up — EverWebinar's own "Attended live" flag is
+    // known to sometimes miss a real attendee who went on to buy.
+    const showedUp = true;
     const inOptIn = keapByEmail.has(r.email);
     const signUp: SignUpRow = {
       fullName,
@@ -501,7 +504,9 @@ export async function generateReport(
     } else {
       country = detectCountryFromFullPhone(fullPhone);
     }
-    const showedUp = !!(r.email && ewByEmail.get(r.email)?.attendedLive);
+    // Same reasoning as the TC loop above — a sign-up always counts as a
+    // show-up regardless of EverWebinar's own attendance flag.
+    const showedUp = true;
     const inOptIn = !!(r.email && keapByEmail.has(r.email));
     const signUp: SignUpRow = {
       fullName: r.fullName || r.email,
@@ -543,7 +548,14 @@ export async function generateReport(
     if (tail && signUpPhoneTails.has(tail)) return true;
     return false;
   };
-  const showedUpEmails = new Set(ew.filter((e) => e.attendedLive).map((e) => e.email));
+  // A sign-up always counts as attended (see the TC/BT loops above), so
+  // include their emails alongside EverWebinar's own "Attended live" list —
+  // this is what makes a Keap contact who signed up but wasn't flagged
+  // "Attended live" correctly show as showedUp: true in the Opt-In table.
+  const showedUpEmails = new Set([
+    ...ew.filter((e) => e.attendedLive).map((e) => e.email),
+    ...Array.from(signUpEmails),
+  ]);
 
   // ===== Show-Ups (from EW) =====
   const showUpRows: ShowUpRow[] = ew
@@ -580,6 +592,29 @@ export async function generateReport(
         inOptIn: !!k,
       };
     });
+
+  // A sign-up always counts as a show-up (see the TC/BT loops above). Add
+  // anyone who signed up but isn't already in showUpRows from EverWebinar's
+  // own "Attended live" list — this is the case EverWebinar sometimes misses.
+  const showUpEmails = new Set(showUpRows.map((r) => (r.email || "").toLowerCase()));
+  for (const s of signUpRows) {
+    const emailLc = (s.email || "").toLowerCase();
+    if (!emailLc || showUpEmails.has(emailLc)) continue;
+    showUpEmails.add(emailLc);
+    showUpRows.push({
+      firstName: s.fullName,
+      lastName: "",
+      fullName: s.fullName,
+      email: s.email,
+      countryCode: s.countryCode,
+      phoneNumber: s.phoneNumber,
+      fullPhone: s.fullPhone,
+      country: s.country,
+      timeInRoom: "",
+      signedUp: true,
+      inOptIn: keapByEmail.has(emailLc),
+    });
+  }
 
   // ===== Opt-Ins =====
   // Keap rows + show-ups appended at bottom for those not in Keap
@@ -638,34 +673,6 @@ export async function generateReport(
         source: "showup_only",
       });
     }
-  }
-
-  // A sign-up (ThriveCart/BT) who is neither a Keap opt-in nor a Show Up
-  // attendee currently exists only in the Sign Ups list — they gave contact
-  // details by paying, so they should still show up as an opt-in. Skip
-  // anyone already represented above by email, or already matched to a Keap
-  // contact by phone (s.inOptIn) even under a different email — appending
-  // them again there would create a duplicate person.
-  const optInEmails = new Set(
-    optInRows.map((r) => (r.email || "").toLowerCase()).filter(Boolean)
-  );
-  for (const s of signUpRows) {
-    const emailLc = (s.email || "").toLowerCase();
-    if (!emailLc || optInEmails.has(emailLc) || s.inOptIn) continue;
-    optInEmails.add(emailLc);
-    optInRows.push({
-      firstName: s.fullName,
-      lastName: "",
-      fullName: s.fullName,
-      email: s.email,
-      countryCode: s.countryCode,
-      phoneNumber: s.phoneNumber,
-      fullPhone: s.fullPhone,
-      country: s.country,
-      showedUp: s.showedUp,
-      signedUp: true,
-      source: "signup_only",
-    });
   }
 
   // ===== Country cross-reference =====
