@@ -640,6 +640,34 @@ export async function generateReport(
     }
   }
 
+  // A sign-up (ThriveCart/BT) who is neither a Keap opt-in nor a Show Up
+  // attendee currently exists only in the Sign Ups list — they gave contact
+  // details by paying, so they should still show up as an opt-in. Skip
+  // anyone already represented above by email, or already matched to a Keap
+  // contact by phone (s.inOptIn) even under a different email — appending
+  // them again there would create a duplicate person.
+  const optInEmails = new Set(
+    optInRows.map((r) => (r.email || "").toLowerCase()).filter(Boolean)
+  );
+  for (const s of signUpRows) {
+    const emailLc = (s.email || "").toLowerCase();
+    if (!emailLc || optInEmails.has(emailLc) || s.inOptIn) continue;
+    optInEmails.add(emailLc);
+    optInRows.push({
+      firstName: s.fullName,
+      lastName: "",
+      fullName: s.fullName,
+      email: s.email,
+      countryCode: s.countryCode,
+      phoneNumber: s.phoneNumber,
+      fullPhone: s.fullPhone,
+      country: s.country,
+      showedUp: s.showedUp,
+      signedUp: true,
+      source: "signup_only",
+    });
+  }
+
   // ===== Country cross-reference =====
   // Same person may appear across opt-in / show-up / sign-up with one row
   // missing the country code prefix (e.g. ThriveCart sign-up phone = "96509711"
