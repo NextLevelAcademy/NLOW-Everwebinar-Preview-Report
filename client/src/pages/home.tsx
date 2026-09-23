@@ -1221,20 +1221,125 @@ function ReportView({
     });
   }
 
+  // The "Show Up" / "Signed Up" checkboxes in these tables are cross-list
+  // membership, not a plain field — Show Up % and Sign Up % come from the
+  // length of report.showUps / report.signUps, not from these booleans. So
+  // toggling one must actually add/remove the person from the real list
+  // (and mirror the flag on the other two tables), or the checkbox would
+  // change nothing the percentages read.
+  function withShowUpToggled(
+    base: { optIns: OptInRow[]; showUps: ShowUpRow[]; signUps: SignUpRow[] },
+    email: string,
+    checked: boolean,
+    contact: { firstName?: string; lastName?: string; fullName: string; countryCode: string; phoneNumber: string; fullPhone: string; country: OptInRow["country"] }
+  ) {
+    const emailLc = (email || "").toLowerCase();
+    if (!emailLc) return base;
+    const idx = base.showUps.findIndex((r) => (r.email || "").toLowerCase() === emailLc);
+    let showUps = base.showUps;
+    if (checked && idx === -1) {
+      showUps = [
+        ...showUps,
+        {
+          firstName: contact.firstName || contact.fullName,
+          lastName: contact.lastName || "",
+          fullName: contact.fullName,
+          email,
+          countryCode: contact.countryCode,
+          phoneNumber: contact.phoneNumber,
+          fullPhone: contact.fullPhone,
+          country: contact.country,
+          timeInRoom: "",
+          signedUp: base.signUps.some((s) => (s.email || "").toLowerCase() === emailLc),
+          inOptIn: base.optIns.some((o) => (o.email || "").toLowerCase() === emailLc),
+        },
+      ];
+    } else if (!checked && idx !== -1) {
+      showUps = showUps.filter((_, i) => i !== idx);
+    }
+    return {
+      optIns: base.optIns.map((r) => ((r.email || "").toLowerCase() === emailLc ? { ...r, showedUp: checked } : r)),
+      showUps,
+      signUps: base.signUps.map((r) => ((r.email || "").toLowerCase() === emailLc ? { ...r, showedUp: checked } : r)),
+    };
+  }
+
+  function withSignUpToggled(
+    base: { optIns: OptInRow[]; showUps: ShowUpRow[]; signUps: SignUpRow[] },
+    email: string,
+    checked: boolean,
+    contact: { fullName: string; countryCode: string; phoneNumber: string; fullPhone: string; country: OptInRow["country"] }
+  ) {
+    const emailLc = (email || "").toLowerCase();
+    if (!emailLc) return base;
+    const idx = base.signUps.findIndex((r) => (r.email || "").toLowerCase() === emailLc);
+    let signUps = base.signUps;
+    if (checked && idx === -1) {
+      signUps = [
+        ...signUps,
+        {
+          fullName: contact.fullName,
+          email,
+          countryCode: contact.countryCode,
+          phoneNumber: contact.phoneNumber,
+          fullPhone: contact.fullPhone,
+          country: contact.country,
+          // No sale data available from a manual toggle — added blank so it
+          // can be filled in directly in the Sign Up table below.
+          source: "BT",
+          intake: "",
+          pricingOption: "",
+          total: 0,
+          orderDate: "",
+          showedUp: base.showUps.some((s) => (s.email || "").toLowerCase() === emailLc),
+          inOptIn: base.optIns.some((o) => (o.email || "").toLowerCase() === emailLc),
+        },
+      ];
+    } else if (!checked && idx !== -1) {
+      signUps = signUps.filter((_, i) => i !== idx);
+    }
+    return {
+      optIns: base.optIns.map((r) => ((r.email || "").toLowerCase() === emailLc ? { ...r, signedUp: checked } : r)),
+      showUps: base.showUps.map((r) => ((r.email || "").toLowerCase() === emailLc ? { ...r, signedUp: checked } : r)),
+      signUps,
+    };
+  }
+
   function updateOptIn(idx: number, patch: Partial<OptInRow>) {
-    recompute({ optIns: report.optIns.map((r, i) => (i === idx ? { ...r, ...patch } : r)) });
+    const row = report.optIns[idx];
+    const optIns = report.optIns.map((r, i) => (i === idx ? { ...r, ...patch } : r));
+    let next = { optIns, showUps: report.showUps, signUps: report.signUps };
+    if (patch.showedUp !== undefined && patch.showedUp !== row.showedUp) {
+      next = withShowUpToggled(next, row.email, patch.showedUp, row);
+    }
+    if (patch.signedUp !== undefined && patch.signedUp !== row.signedUp) {
+      next = withSignUpToggled(next, row.email, patch.signedUp, row);
+    }
+    recompute(next);
   }
   function deleteOptIn(idx: number) {
     recompute({ optIns: report.optIns.filter((_, i) => i !== idx) });
   }
   function updateShowUp(idx: number, patch: Partial<ShowUpRow>) {
-    recompute({ showUps: report.showUps.map((r, i) => (i === idx ? { ...r, ...patch } : r)) });
+    const row = report.showUps[idx];
+    const showUps = report.showUps.map((r, i) => (i === idx ? { ...r, ...patch } : r));
+    let next = { optIns: report.optIns, showUps, signUps: report.signUps };
+    if (patch.signedUp !== undefined && patch.signedUp !== row.signedUp) {
+      next = withSignUpToggled(next, row.email, patch.signedUp, row);
+    }
+    recompute(next);
   }
   function deleteShowUp(idx: number) {
     recompute({ showUps: report.showUps.filter((_, i) => i !== idx) });
   }
   function updateSignUp(idx: number, patch: Partial<SignUpRow>) {
-    recompute({ signUps: report.signUps.map((r, i) => (i === idx ? { ...r, ...patch } : r)) });
+    const row = report.signUps[idx];
+    const signUps = report.signUps.map((r, i) => (i === idx ? { ...r, ...patch } : r));
+    let next = { optIns: report.optIns, showUps: report.showUps, signUps };
+    if (patch.showedUp !== undefined && patch.showedUp !== row.showedUp) {
+      next = withShowUpToggled(next, row.email, patch.showedUp, row);
+    }
+    recompute(next);
   }
   function deleteSignUp(idx: number) {
     recompute({ signUps: report.signUps.filter((_, i) => i !== idx) });
