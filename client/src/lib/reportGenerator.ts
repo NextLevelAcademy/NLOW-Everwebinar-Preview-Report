@@ -15,6 +15,14 @@ function digits(s: string | null | undefined): string {
   return (s || "").replace(/\D/g, "");
 }
 
+// Some Keap exports have the "65" country code typed twice (e.g. a contact
+// enters "+6594682910" and Keap's own cc column adds another "65" on top,
+// producing "656594682910"). Only strips an exact leading "6565" — a
+// number like "650122123318" that merely starts with "65" is left alone.
+function stripDoubled65(d: string): string {
+  return d.startsWith("6565") ? d.slice(2) : d;
+}
+
 /**
  * Build full international phone digits (no plus). Logic:
  * - If cc is provided AND phone does NOT already start with cc → fullPhone = cc + phone
@@ -129,13 +137,20 @@ interface KeapRow {
 
 function parseKeapRows(rows: Record<string, any>[]): KeapRow[] {
   return rows
-    .map((r) => ({
-      first: getVal(r, ["First Name", "FirstName"]),
-      last: getVal(r, ["Last Name", "LastName"]),
-      email: getVal(r, ["Email", "Email Address"]).toLowerCase(),
-      cc: getVal(r, ["Mobile Country Code", "Country Code", "PhoneCountryCode"]),
-      phone: getVal(r, ["Phone 1", "Phone", "Mobile", "Mobile Phone"]),
-    }))
+    .map((r) => {
+      const cc = getVal(r, ["Mobile Country Code", "Country Code", "PhoneCountryCode"]);
+      const rawPhone = getVal(r, ["Phone 1", "Phone", "Mobile", "Mobile Phone"]);
+      // Only normalize when there's no separate cc column already carrying
+      // the "65" — otherwise the doubling lives entirely in the phone field.
+      const phone = !digits(cc) ? stripDoubled65(digits(rawPhone)) || rawPhone : rawPhone;
+      return {
+        first: getVal(r, ["First Name", "FirstName"]),
+        last: getVal(r, ["Last Name", "LastName"]),
+        email: getVal(r, ["Email", "Email Address"]).toLowerCase(),
+        cc,
+        phone,
+      };
+    })
     .filter((r) => r.email);
 }
 
