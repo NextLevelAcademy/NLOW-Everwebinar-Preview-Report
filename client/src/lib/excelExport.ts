@@ -299,7 +299,80 @@ export function downloadExcelReport(report: ReportData): void {
   ];
   XLSX.utils.book_append_sheet(wb, notInOptInSheet, "Show Up Not In Opt-In");
 
-  // ============ Sheet 7: Students List ============
+  // ============ Sheet 7: NLOW4 Old Students ============
+  // Cross-references this session's Opt-In / Show-Up / Sign-Up rows against
+  // the optional Tag 4 List (NLOW4) upload — i.e. contacts who already
+  // bought in a past session — by email or phone. One row per unique
+  // matched person, so you can see which old students came back.
+  const nlow4Phones = new Set(
+    (report.nlow4ExcludedPhones ?? []).map((p) => p.replace(/\D/g, "")).filter(Boolean)
+  );
+  const nlow4Emails = new Set(
+    (report.nlow4ExcludedEmails ?? []).map((e) => e.toLowerCase()).filter(Boolean)
+  );
+  type Nlow4Match = {
+    fullName: string;
+    email: string;
+    fullPhone: string;
+    country: string;
+    optIn: boolean;
+    showUp: boolean;
+    signUp: boolean;
+  };
+  const nlow4Matches = new Map<string, Nlow4Match>();
+  const isNlow4Match = (email: string, fullPhone: string): boolean => {
+    const e = (email || "").toLowerCase();
+    const p = (fullPhone || "").replace(/\D/g, "");
+    return (!!e && nlow4Emails.has(e)) || (!!p && nlow4Phones.has(p));
+  };
+  const addNlow4Match = (
+    fullName: string,
+    email: string,
+    fullPhone: string,
+    country: string,
+    which: "optIn" | "showUp" | "signUp"
+  ) => {
+    if (!isNlow4Match(email, fullPhone)) return;
+    const key = (email || "").toLowerCase() || fullPhone.replace(/\D/g, "");
+    if (!key) return;
+    const existing = nlow4Matches.get(key);
+    if (existing) {
+      existing[which] = true;
+    } else {
+      nlow4Matches.set(key, {
+        fullName,
+        email,
+        fullPhone,
+        country,
+        optIn: which === "optIn",
+        showUp: which === "showUp",
+        signUp: which === "signUp",
+      });
+    }
+  };
+  for (const r of report.optIns) addNlow4Match(r.fullName, r.email, r.fullPhone, r.country, "optIn");
+  for (const r of report.showUps) addNlow4Match(r.fullName, r.email, r.fullPhone, r.country, "showUp");
+  for (const r of report.signUps) addNlow4Match(r.fullName, r.email, r.fullPhone, r.country, "signUp");
+
+  const nlow4Data: any[][] = [
+    ["Name", "Email", "Phone Number", "Country", "Opt In", "Show Up", "Sign Up"],
+    ...Array.from(nlow4Matches.values()).map((m) => [
+      m.fullName,
+      m.email,
+      m.fullPhone,
+      m.country,
+      m.optIn ? "Yes" : "",
+      m.showUp ? "Yes" : "",
+      m.signUp ? "Yes" : "",
+    ]),
+  ];
+  const nlow4Sheet = XLSX.utils.aoa_to_sheet(nlow4Data);
+  nlow4Sheet["!cols"] = [
+    { wch: 22 }, { wch: 32 }, { wch: 14 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 8 },
+  ];
+  XLSX.utils.book_append_sheet(wb, nlow4Sheet, "NLOW4 Old Students");
+
+  // ============ Sheet 8: Students List ============
   // One row per sign-up. Columns map from sign-up data:
   //   Name, Email Address, Mobile (full phone), Mobile Country Code (country),
   //   Welcome WATI (blank), TM (blank), Affiliate ID ("-"),
