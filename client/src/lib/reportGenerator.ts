@@ -3,6 +3,7 @@ import type {
   OptInRow,
   ReportData,
   SessionDetails,
+  ShortDurationExclusionRow,
   ShowUpRow,
   SignUpRow,
 } from "../../../shared/schema";
@@ -193,7 +194,9 @@ interface EWRow {
   cc: string;
   phone: string;
   attendedLive: boolean;
+  rawAttended: boolean;
   timeInRoom: string;
+  timeInRoomMinutes: number;
 }
 
 // EverWebinar's "Time in live room" is "hh:mm:ss" (e.g. "01:43:29").
@@ -222,7 +225,9 @@ function parseEWRows(rows: Record<string, any>[]): EWRow[] {
         cc: getVal(r, ["Phone country code", "Country code", "PhoneCountryCode"]),
         phone: getVal(r, ["Phone number", "Phone", "PhoneNumber"]),
         attendedLive: rawAttended && timeInRoomMinutes >= MIN_SHOWUP_MINUTES,
+        rawAttended,
         timeInRoom,
+        timeInRoomMinutes,
       };
     })
     .filter((r) => r.email || r.phone);
@@ -631,6 +636,33 @@ export async function generateReport(
     });
   }
 
+  // ===== Excluded for short duration =====
+  // EverWebinar marked these as "Attended live" but they stayed under the
+  // show-up minutes threshold. Skip anyone already promoted into showUpRows
+  // via the sign-up override above — a short-duration attendee who went on
+  // to buy already counts as a full show-up, not an exclusion.
+  const shortDurationExclusions: ShortDurationExclusionRow[] = ew
+    .filter((r) => r.rawAttended && r.timeInRoomMinutes < MIN_SHOWUP_MINUTES)
+    .filter((r) => !showUpEmails.has((r.email || "").toLowerCase()))
+    .map((r) => {
+      const k = keapByEmail.get(r.email);
+      const built = buildFullPhone(r.cc, r.phone);
+      const keapCountry = k ? detectCountryFromKeap(k.cc, k.phone) : "NA";
+      const country = k && keapCountry !== "NA" ? keapCountry : detectCountryFromEW(r.cc, r.phone);
+      return {
+        firstName: r.first,
+        lastName: r.last,
+        fullName: `${r.first} ${r.last}`.trim() || r.email,
+        email: r.email,
+        countryCode: built.countryCode,
+        phoneNumber: built.phoneNumber,
+        fullPhone: built.fullPhone,
+        country,
+        timeInRoom: r.timeInRoom,
+        durationMinutes: Math.round(r.timeInRoomMinutes * 100) / 100,
+      };
+    });
+
   // ===== Opt-Ins =====
   // Keap rows + show-ups appended at bottom for those not in Keap
   const keapEmails = new Set(keap.map((k) => k.email));
@@ -767,6 +799,7 @@ export async function generateReport(
     showUps: showUpRows,
     signUps: signUpRows,
     showUpsNotInOptIn,
+    shortDurationExclusions,
     generatedAt: new Date().toISOString(),
     nlow4ExcludedPhones,
     nlow4ExcludedEmails,

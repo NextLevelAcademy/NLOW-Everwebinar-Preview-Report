@@ -32,6 +32,7 @@ import type {
   OptInRow,
   ReportData,
   SessionDetails,
+  ShortDurationExclusionRow,
   ShowUpRow,
   SignUpRow,
   VWDateEntry,
@@ -804,6 +805,117 @@ function OptInTable({
   );
 }
 
+function ShortDurationTable({
+  rows,
+  onUpdate,
+  onPromote,
+  onDelete,
+}: {
+  rows: ShortDurationExclusionRow[];
+  onUpdate: (idx: number, patch: Partial<ShortDurationExclusionRow>) => void;
+  onPromote: (idx: number) => void;
+  onDelete: (idx: number) => void;
+}) {
+  return (
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <h3 className="font-semibold text-sm text-foreground">
+          Excluded — Under 10 Minutes ({rows.length})
+        </h3>
+        <span className="text-xs text-muted-foreground font-medium">
+          click any cell to edit
+        </span>
+      </div>
+      <div className="overflow-x-auto max-h-[32rem] overflow-y-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-muted/50 sticky top-0">
+            <tr>
+              <th className="px-4 py-2.5 text-left font-medium text-muted-foreground whitespace-nowrap">
+                #
+              </th>
+              <th className="px-4 py-2.5 text-left font-medium text-muted-foreground whitespace-nowrap">
+                Name
+              </th>
+              <th className="px-4 py-2.5 text-left font-medium text-muted-foreground whitespace-nowrap">
+                Email
+              </th>
+              <th className="px-4 py-2.5 text-left font-medium text-muted-foreground whitespace-nowrap">
+                Phone
+              </th>
+              <th className="px-4 py-2.5 text-left font-medium text-muted-foreground whitespace-nowrap">
+                Country
+              </th>
+              <th className="px-4 py-2.5 text-left font-medium text-muted-foreground whitespace-nowrap">
+                Duration (min)
+              </th>
+              <th className="px-4 py-2.5 text-left font-medium text-muted-foreground whitespace-nowrap"></th>
+              <th className="px-4 py-2.5 text-left font-medium text-muted-foreground whitespace-nowrap"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr
+                key={`${r.email}-${i}`}
+                className="border-t border-border/50 bg-amber-50/50 dark:bg-amber-950/10"
+                data-testid={`shortdur-row-${i}`}
+              >
+                <td className="px-4 py-1 text-muted-foreground">{i + 1}</td>
+                <td className="px-4 py-1 font-medium text-foreground">
+                  <EditableText
+                    value={r.fullName}
+                    onCommit={(v) => onUpdate(i, { fullName: v, firstName: v, lastName: "" })}
+                    testId={`shortdur-name-${i}`}
+                  />
+                </td>
+                <td className="px-4 py-1 text-muted-foreground">
+                  <EditableText
+                    value={r.email}
+                    onCommit={(v) => onUpdate(i, { email: v })}
+                    testId={`shortdur-email-${i}`}
+                  />
+                </td>
+                <td className="px-4 py-1 tabular-nums">
+                  <EditableText
+                    value={r.fullPhone}
+                    onCommit={(v) => onUpdate(i, { fullPhone: v })}
+                    testId={`shortdur-phone-${i}`}
+                  />
+                </td>
+                <td className="px-4 py-1">
+                  <CountrySelect
+                    value={r.country}
+                    onCommit={(v) => onUpdate(i, { country: v as ShortDurationExclusionRow["country"] })}
+                    testId={`shortdur-country-${i}`}
+                  />
+                </td>
+                <td className="px-4 py-1 tabular-nums">
+                  <EditableNumber
+                    value={r.durationMinutes}
+                    onCommit={(v) => onUpdate(i, { durationMinutes: v })}
+                    testId={`shortdur-duration-${i}`}
+                  />
+                </td>
+                <td className="px-4 py-1">
+                  <button
+                    onClick={() => onPromote(i)}
+                    data-testid={`shortdur-promote-${i}`}
+                    className="text-xs font-medium text-primary hover:underline whitespace-nowrap"
+                  >
+                    Count as Show Up
+                  </button>
+                </td>
+                <td className="px-4 py-1">
+                  <DeleteRowButton onClick={() => onDelete(i)} testId={`shortdur-delete-${i}`} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function ShowUpTable({
   rows,
   onUpdate,
@@ -1205,11 +1317,13 @@ function ReportView({
     showUps?: ShowUpRow[];
     signUps?: SignUpRow[];
     sessionDetails?: SessionDetails;
+    shortDurationExclusions?: ShortDurationExclusionRow[];
   }) {
     const optIns = next.optIns ?? report.optIns;
     const showUps = next.showUps ?? report.showUps;
     const signUps = next.signUps ?? report.signUps;
     const sessionDetails = next.sessionDetails ?? report.sessionDetails;
+    const shortDurationExclusions = next.shortDurationExclusions ?? report.shortDurationExclusions;
     const derived = deriveMetrics(sessionDetails, optIns, showUps, signUps);
     onReportChange({
       ...report,
@@ -1217,6 +1331,7 @@ function ReportView({
       optIns,
       showUps,
       signUps,
+      shortDurationExclusions,
       ...derived,
     });
   }
@@ -1331,6 +1446,25 @@ function ReportView({
   }
   function deleteShowUp(idx: number) {
     recompute({ showUps: report.showUps.filter((_, i) => i !== idx) });
+  }
+  function promoteShortDuration(idx: number) {
+    const row = report.shortDurationExclusions[idx];
+    const shortDurationExclusions = report.shortDurationExclusions.filter((_, i) => i !== idx);
+    let next = { optIns: report.optIns, showUps: report.showUps, signUps: report.signUps };
+    next = withShowUpToggled(next, row.email, true, row);
+    recompute({ ...next, shortDurationExclusions });
+  }
+  function updateShortDurationExclusion(idx: number, patch: Partial<ShortDurationExclusionRow>) {
+    recompute({
+      shortDurationExclusions: report.shortDurationExclusions.map((r, i) =>
+        i === idx ? { ...r, ...patch } : r
+      ),
+    });
+  }
+  function deleteShortDurationExclusion(idx: number) {
+    recompute({
+      shortDurationExclusions: report.shortDurationExclusions.filter((_, i) => i !== idx),
+    });
   }
   function updateSignUp(idx: number, patch: Partial<SignUpRow>) {
     const row = report.signUps[idx];
@@ -1563,6 +1697,17 @@ function ReportView({
       <div className="mb-6">
         <ShowUpTable rows={report.showUps} onUpdate={updateShowUp} onDelete={deleteShowUp} />
       </div>
+
+      {report.shortDurationExclusions.length > 0 && (
+        <div className="mb-6">
+          <ShortDurationTable
+            rows={report.shortDurationExclusions}
+            onUpdate={updateShortDurationExclusion}
+            onPromote={promoteShortDuration}
+            onDelete={deleteShortDurationExclusion}
+          />
+        </div>
+      )}
 
       {notInOptInEntries.length > 0 && (
         <div className="mb-6">

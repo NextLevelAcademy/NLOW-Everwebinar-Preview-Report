@@ -429,6 +429,24 @@ export function downloadExcelReport(report: ReportData): void {
   ];
   XLSX.utils.book_append_sheet(wb, studentsListSheet, "Students List");
 
+  // ============ Sheet 9: Excluded Under 10 Min ============
+  const shortDurData: any[][] = [
+    ["Name", "Email", "Phone Number", "Country", "Time in Room", "Duration (min)"],
+    ...report.shortDurationExclusions.map((r) => [
+      r.fullName,
+      r.email,
+      r.fullPhone,
+      r.country,
+      r.timeInRoom,
+      r.durationMinutes,
+    ]),
+  ];
+  const shortDurSheet = XLSX.utils.aoa_to_sheet(shortDurData);
+  shortDurSheet["!cols"] = [
+    { wch: 22 }, { wch: 32 }, { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 14 },
+  ];
+  XLSX.utils.book_append_sheet(wb, shortDurSheet, "Excluded Under 10 Min");
+
   // Filename — match target convention: NLOW_Preview_Report_YYYY-MM-DD-1.xlsx
   const safeDate = yyyymmdd || new Date().toISOString().split("T")[0];
   const filename = `NLOW_Preview_Report_${safeDate}-1.xlsx`;

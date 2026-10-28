@@ -178,6 +178,22 @@ export interface ShowUpNotInOptInRow {
   country: CountryGroup;
 }
 
+/** Someone EverWebinar marked "Attended live" but whose time in the room
+ * was under the show-up minutes threshold — excluded from showUps/showUpCount,
+ * kept here so they can be reviewed and manually promoted into Show Up. */
+export interface ShortDurationExclusionRow {
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+  countryCode: string;
+  phoneNumber: string;
+  fullPhone: string;
+  country: CountryGroup;
+  timeInRoom: string;
+  durationMinutes: number;
+}
+
 export interface CountryBreakdown {
   SG: number;
   MY: number;
@@ -198,6 +214,10 @@ export interface ReportData {
   showUps: ShowUpRow[];
   signUps: SignUpRow[];
   showUpsNotInOptIn: ShowUpNotInOptInRow[];
+  // Marked "Attended live" by EverWebinar but under the show-up minutes
+  // threshold — excluded from showUps/showUpCount, kept here so they can be
+  // reviewed and manually promoted into Show Up if the exclusion was wrong.
+  shortDurationExclusions: ShortDurationExclusionRow[];
   generatedAt: string;
   // Tag 4 List exclusion (NLOW4) — contacts in the uploaded Tag 4 CSV are
   // filtered out of the No-Show broadcast only. Match by normalized phone
