@@ -3,7 +3,6 @@ import type {
   OptInRow,
   ReportData,
   SessionDetails,
-  ShortDurationExclusionRow,
   ShowUpRow,
   SignUpRow,
 } from "../../../shared/schema";
@@ -194,40 +193,22 @@ interface EWRow {
   cc: string;
   phone: string;
   attendedLive: boolean;
-  rawAttended: boolean;
   timeInRoom: string;
-  timeInRoomMinutes: number;
 }
-
-// EverWebinar's "Time in live room" is "hh:mm:ss" (e.g. "01:43:29").
-function parseHmsToMinutes(hms: string): number {
-  const parts = (hms || "").split(":").map((p) => parseInt(p, 10));
-  if (parts.some((p) => Number.isNaN(p))) return 0;
-  const [h = 0, m = 0, s = 0] = parts.length === 3 ? parts : [0, ...parts];
-  return h * 60 + m + s / 60;
-}
-
-// A join that lasted under MIN_SHOWUP_MINUTES isn't a real show-up (exactly
-// MIN_SHOWUP_MINUTES still counts), so it's tagged as a no-show everywhere
-// downstream even if EverWebinar's own "Attended live" column says Yes.
-const MIN_SHOWUP_MINUTES = 10;
 
 function parseEWRows(rows: Record<string, any>[]): EWRow[] {
   return rows
     .map((r) => {
-      const rawAttended = /yes|true|1/i.test(getVal(r, ["Attended live", "AttendedLive"]));
+      const attendedLive = /yes|true|1/i.test(getVal(r, ["Attended live", "AttendedLive"]));
       const timeInRoom = getVal(r, ["Time in live room", "Time in Room", "TimeInRoom"]);
-      const timeInRoomMinutes = parseHmsToMinutes(timeInRoom);
       return {
         first: getVal(r, ["First name", "First Name", "FirstName"]),
         last: getVal(r, ["Last name", "Last Name", "LastName"]),
         email: getVal(r, ["Email", "Email Address"]).toLowerCase(),
         cc: getVal(r, ["Phone country code", "Country code", "PhoneCountryCode"]),
         phone: getVal(r, ["Phone number", "Phone", "PhoneNumber"]),
-        attendedLive: rawAttended && timeInRoomMinutes >= MIN_SHOWUP_MINUTES,
-        rawAttended,
+        attendedLive,
         timeInRoom,
-        timeInRoomMinutes,
       };
     })
     .filter((r) => r.email || r.phone);
@@ -636,33 +617,6 @@ export async function generateReport(
     });
   }
 
-  // ===== Excluded for short duration =====
-  // EverWebinar marked these as "Attended live" but they stayed under the
-  // show-up minutes threshold. Skip anyone already promoted into showUpRows
-  // via the sign-up override above — a short-duration attendee who went on
-  // to buy already counts as a full show-up, not an exclusion.
-  const shortDurationExclusions: ShortDurationExclusionRow[] = ew
-    .filter((r) => r.rawAttended && r.timeInRoomMinutes < MIN_SHOWUP_MINUTES)
-    .filter((r) => !showUpEmails.has((r.email || "").toLowerCase()))
-    .map((r) => {
-      const k = keapByEmail.get(r.email);
-      const built = buildFullPhone(r.cc, r.phone);
-      const keapCountry = k ? detectCountryFromKeap(k.cc, k.phone) : "NA";
-      const country = k && keapCountry !== "NA" ? keapCountry : detectCountryFromEW(r.cc, r.phone);
-      return {
-        firstName: r.first,
-        lastName: r.last,
-        fullName: `${r.first} ${r.last}`.trim() || r.email,
-        email: r.email,
-        countryCode: built.countryCode,
-        phoneNumber: built.phoneNumber,
-        fullPhone: built.fullPhone,
-        country,
-        timeInRoom: r.timeInRoom,
-        durationMinutes: Math.round(r.timeInRoomMinutes * 100) / 100,
-      };
-    });
-
   // ===== Opt-Ins =====
   // Keap rows + show-ups appended at bottom for those not in Keap
   const keapEmails = new Set(keap.map((k) => k.email));
@@ -799,7 +753,6 @@ export async function generateReport(
     showUps: showUpRows,
     signUps: signUpRows,
     showUpsNotInOptIn,
-    shortDurationExclusions,
     generatedAt: new Date().toISOString(),
     nlow4ExcludedPhones,
     nlow4ExcludedEmails,
